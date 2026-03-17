@@ -28,7 +28,7 @@ export default function TeamsPage() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [departmentId, setDepartmentId] = useState('');
+  const [departmentId, setDepartmentId] = useState('none');
   const [error, setError] = useState('');
 
   const myRole = me?.memberships?.find((m) => m.organizationId === activeOrganizationId)?.role;
@@ -37,9 +37,9 @@ export default function TeamsPage() {
   const handleCreate = () => {
     setError('');
     createTeam.mutate(
-      { name, description: description || undefined, departmentId: departmentId || undefined },
+      { name, description: description || undefined, departmentId: departmentId !== 'none' ? departmentId : undefined },
       {
-        onSuccess: () => { setOpen(false); setName(''); setDescription(''); setDepartmentId(''); },
+        onSuccess: () => { setOpen(false); setName(''); setDescription(''); setDepartmentId('none'); },
         onError: (e) => setError(getApiErrorMessage(e)),
       },
     );
@@ -71,7 +71,7 @@ export default function TeamsPage() {
                     <Select value={departmentId} onValueChange={setDepartmentId}>
                       <SelectTrigger><SelectValue placeholder="No department" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No department</SelectItem>
+                        <SelectItem value="none">No department</SelectItem>
                         {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
                       </SelectContent>
                     </Select>

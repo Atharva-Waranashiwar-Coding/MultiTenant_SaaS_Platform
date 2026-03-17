@@ -29,13 +29,13 @@ export default function ProjectsPage() {
   const canManage = ['OWNER', 'ADMIN', 'MANAGER'].includes(myRole ?? '');
 
   // Filters
-  const [filterStatus, setFilterStatus] = useState('');
-  const [filterPriority, setFilterPriority] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterPriority, setFilterPriority] = useState('all');
   const [includeArchived, setIncludeArchived] = useState(false);
 
   const { data: projects, isLoading } = useProjects(activeOrganizationId ?? undefined, {
-    status: filterStatus || undefined,
-    priority: filterPriority || undefined,
+    status: filterStatus !== 'all' ? filterStatus : undefined,
+    priority: filterPriority !== 'all' ? filterPriority : undefined,
     includeArchived,
   });
   const { data: orgMembers } = useMembers(activeOrganizationId ?? undefined);
@@ -150,14 +150,14 @@ export default function ProjectsPage() {
         <Select value={filterStatus} onValueChange={setFilterStatus}>
           <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="All statuses" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All statuses</SelectItem>
+            <SelectItem value="all">All statuses</SelectItem>
             {STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={filterPriority} onValueChange={setFilterPriority}>
           <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="All priorities" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All priorities</SelectItem>
+            <SelectItem value="all">All priorities</SelectItem>
             {PRIORITY_OPTIONS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
           </SelectContent>
         </Select>

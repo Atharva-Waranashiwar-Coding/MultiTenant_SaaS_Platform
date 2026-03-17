@@ -4,20 +4,24 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api/auth';
 import { useAuthStore } from '@/store/auth.store';
-import { getApiErrorMessage } from '@/lib/utils';
 
 export function useMe() {
-  const { accessToken, setUser } = useAuthStore();
+  const { accessToken, setUser, clearAuth } = useAuthStore();
 
   return useQuery({
     queryKey: ['me'],
     queryFn: async () => {
-      const user = await authApi.me();
-      setUser(user);
-      return user;
+      try {
+        const user = await authApi.me();
+        setUser(user);
+        return user;
+      } catch {
+        clearAuth();
+        throw new Error('Session expired');
+      }
     },
     enabled: !!accessToken,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 5,
     retry: false,
   });
 }
@@ -25,32 +29,40 @@ export function useMe() {
 export function useSignup() {
   const { setAuth } = useAuthStore();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: authApi.signup,
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       setAuth(data.user, data.accessToken, data.refreshToken);
-      // New user: go to org creation
+      const fullUser = await authApi.me();
+      setAuth(fullUser, data.accessToken, data.refreshToken);
+      queryClient.setQueryData(['me'], fullUser);
       router.replace('/org/new');
     },
   });
 }
 
 export function useLogin() {
-  const { setAuth, user } = useAuthStore();
+  const { setAuth } = useAuthStore();
   const router = useRouter();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: authApi.login,
     onSuccess: async (data) => {
+      // Set tokens first so axios interceptor picks them up
       setAuth(data.user, data.accessToken, data.refreshToken);
-      queryClient.setQueryData(['me'], data.user);
 
-      // If user has no memberships, go create an org
-      if (!data.user.memberships || data.user.memberships.length === 0) {
+      // Fetch full user with memberships
+      const fullUser = await authApi.me();
+      setAuth(fullUser, data.accessToken, data.refreshToken);
+      queryClient.setQueryData(['me'], fullUser);
+
+      const memberships = fullUser.memberships ?? [];
+      if (memberships.length === 0) {
         router.replace('/org/new');
-      } else if (data.user.memberships.length === 1) {
+      } else if (memberships.length === 1) {
         router.replace('/dashboard');
       } else {
         router.replace('/org/select');

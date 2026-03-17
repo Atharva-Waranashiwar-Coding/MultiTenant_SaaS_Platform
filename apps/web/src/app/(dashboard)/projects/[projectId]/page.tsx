@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/auth.store';
 import { useMe } from '@/hooks/use-auth';
@@ -29,8 +29,8 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
   TODO: 'To Do', IN_PROGRESS: 'In Progress', IN_REVIEW: 'In Review', DONE: 'Done', CANCELLED: 'Cancelled',
 };
 
-export default function ProjectDetailPage({ params }: { params: Promise<{ projectId: string }> }) {
-  const { projectId } = use(params);
+export default function ProjectDetailPage({ params }: { params: { projectId: string } }) {
+  const { projectId } = params;
   const { activeOrganizationId } = useAuthStore();
   const { data: me } = useMe();
 
@@ -50,7 +50,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
   const canEdit = canManage || myRole === 'MANAGER';
 
   // Task filter
-  const [taskStatusFilter, setTaskStatusFilter] = useState<TaskStatus | ''>('');
+  const [taskStatusFilter, setTaskStatusFilter] = useState<TaskStatus | 'all'>('all');
 
   // Add member dialog
   const [addMemberOpen, setAddMemberOpen] = useState(false);
@@ -60,14 +60,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
   const [addTaskOpen, setAddTaskOpen] = useState(false);
   const [taskTitle, setTaskTitle] = useState('');
   const [taskPriority, setTaskPriority] = useState<Priority>('MEDIUM');
-  const [taskAssignee, setTaskAssignee] = useState('');
+  const [taskAssignee, setTaskAssignee] = useState('unassigned');
   const [taskDueDate, setTaskDueDate] = useState('');
   const [taskError, setTaskError] = useState('');
 
   const projectMemberIds = new Set(project?.members?.map((m) => m.userId) ?? []);
   const addableMembers = orgMembers?.filter((m) => !projectMemberIds.has(m.userId)) ?? [];
 
-  const filteredTasks = tasks?.filter((t) => !taskStatusFilter || t.status === taskStatusFilter) ?? [];
+  const filteredTasks = tasks?.filter((t) => taskStatusFilter === 'all' || t.status === taskStatusFilter) ?? [];
 
   const handleAddMember = () => {
     addProjectMember.mutate(selectedMemberId, {
@@ -81,11 +81,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
       {
         title: taskTitle,
         priority: taskPriority,
-        assigneeId: taskAssignee || undefined,
+        assigneeId: taskAssignee !== 'unassigned' ? taskAssignee : undefined,
         dueDate: taskDueDate || undefined,
       },
       {
-        onSuccess: () => { setAddTaskOpen(false); setTaskTitle(''); setTaskPriority('MEDIUM'); setTaskAssignee(''); setTaskDueDate(''); },
+        onSuccess: () => { setAddTaskOpen(false); setTaskTitle(''); setTaskPriority('MEDIUM'); setTaskAssignee('unassigned'); setTaskDueDate(''); },
         onError: (e) => setTaskError(getApiErrorMessage(e)),
       },
     );
@@ -149,10 +149,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-base">Tasks ({filteredTasks.length})</CardTitle>
           <div className="flex items-center gap-2">
-            <Select value={taskStatusFilter} onValueChange={(v) => setTaskStatusFilter(v as TaskStatus | '')}>
+            <Select value={taskStatusFilter} onValueChange={(v) => setTaskStatusFilter(v as TaskStatus | 'all')}>
               <SelectTrigger className="h-7 w-36 text-xs"><SelectValue placeholder="All statuses" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All statuses</SelectItem>
+                <SelectItem value="all">All statuses</SelectItem>
                 {TASK_STATUSES.map((s) => <SelectItem key={s} value={s}>{STATUS_LABELS[s]}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -190,7 +190,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
                         <Select value={taskAssignee} onValueChange={setTaskAssignee}>
                           <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Unassigned</SelectItem>
+                            <SelectItem value="unassigned">Unassigned</SelectItem>
                             {project.members.map((m) => (
                               <SelectItem key={m.userId} value={m.userId}>
                                 {m.user?.firstName} {m.user?.lastName}

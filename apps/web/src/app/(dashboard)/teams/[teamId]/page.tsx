@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/auth.store';
 import { useMe } from '@/hooks/use-auth';
@@ -15,8 +15,8 @@ import { PageHeader } from '@/components/ui/page-header';
 import { getInitials, getApiErrorMessage } from '@/lib/utils';
 import { ArrowLeft, UserPlus, Trash2, Crown, Building2 } from 'lucide-react';
 
-export default function TeamDetailPage({ params }: { params: Promise<{ teamId: string }> }) {
-  const { teamId } = use(params);
+export default function TeamDetailPage({ params }: { params: { teamId: string } }) {
+  const { teamId } = params;
   const { activeOrganizationId } = useAuthStore();
   const { data: me } = useMe();
   const { data: team, isLoading } = useTeam(activeOrganizationId ?? undefined, teamId);

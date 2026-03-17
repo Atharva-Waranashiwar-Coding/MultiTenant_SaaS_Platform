@@ -1,10 +1,13 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useLogin } from '@/hooks/use-auth';
+import { useAuthStore } from '@/store/auth.store';
 import { getApiErrorMessage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +23,15 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const { mutate: login, isPending, error } = useLogin();
+  const { accessToken, _hasHydrated } = useAuthStore();
+  const router = useRouter();
+
+  // If already logged in, go straight to dashboard
+  useEffect(() => {
+    if (_hasHydrated && accessToken) {
+      router.replace('/dashboard');
+    }
+  }, [_hasHydrated, accessToken, router]);
 
   const {
     register,

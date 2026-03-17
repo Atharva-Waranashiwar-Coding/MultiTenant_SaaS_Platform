@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import { useAuthStore } from '@/store/auth.store';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/lib/axios';
@@ -13,8 +12,8 @@ import { getRoleBadgeColor, getInitials, formatDate } from '@/lib/utils';
 import { Building2, Users, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
-export default function MemberDetailPage({ params }: { params: Promise<{ userId: string }> }) {
-  const { userId } = use(params);
+export default function MemberDetailPage({ params }: { params: { userId: string } }) {
+  const { userId } = params;
   const { activeOrganizationId } = useAuthStore();
 
   const { data: membership, isLoading } = useQuery<Membership>({

@@ -8,24 +8,29 @@ import { useAuthStore } from '@/store/auth.store';
 import { useMe } from '@/hooks/use-auth';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { accessToken } = useAuthStore();
+  const { accessToken, _hasHydrated } = useAuthStore();
   const router = useRouter();
   const { isLoading } = useMe();
 
   useEffect(() => {
-    if (!accessToken) {
+    if (_hasHydrated && !accessToken) {
       router.replace('/login');
     }
-  }, [accessToken, router]);
+  }, [_hasHydrated, accessToken, router]);
 
-  if (!accessToken) return null;
+  // Spinner while Zustand rehydrates from localStorage
+  if (!_hasHydrated) {
+    return <FullPageSpinner />;
+  }
 
+  // Not authenticated — render nothing while redirect fires
+  if (!accessToken) {
+    return null;
+  }
+
+  // Spinner while /auth/me loads
   if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
+    return <FullPageSpinner />;
   }
 
   return (
@@ -35,6 +40,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <Topbar />
         <main className="flex-1 overflow-y-auto bg-muted/20 p-6">{children}</main>
       </div>
+    </div>
+  );
+}
+
+function FullPageSpinner() {
+  return (
+    <div className="flex h-screen items-center justify-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState } from 'react';
+import { useState } from 'react';
 import { useAuthStore } from '@/store/auth.store';
 import { useMe } from '@/hooks/use-auth';
 import { useDepartment, useAddDepartmentMember, useRemoveDepartmentMember } from '@/hooks/use-departments';
@@ -15,8 +15,8 @@ import { PageHeader } from '@/components/ui/page-header';
 import { getInitials, getApiErrorMessage } from '@/lib/utils';
 import { ArrowLeft, UserPlus, Trash2, Crown } from 'lucide-react';
 
-export default function DepartmentDetailPage({ params }: { params: Promise<{ deptId: string }> }) {
-  const { deptId } = use(params);
+export default function DepartmentDetailPage({ params }: { params: { deptId: string } }) {
+  const { deptId } = params;
   const { activeOrganizationId } = useAuthStore();
   const { data: me } = useMe();
   const { data: dept, isLoading } = useDepartment(activeOrganizationId ?? undefined, deptId);

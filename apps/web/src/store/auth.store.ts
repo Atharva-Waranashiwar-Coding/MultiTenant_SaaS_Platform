@@ -7,15 +7,15 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   activeOrganizationId: string | null;
+  _hasHydrated: boolean;
 
   setAuth: (user: User, accessToken: string, refreshToken: string) => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
   setActiveOrganization: (orgId: string) => void;
   setUser: (user: User) => void;
   clearAuth: () => void;
+  setHasHydrated: (v: boolean) => void;
 
-  // Derived helpers
-  isAuthenticated: () => boolean;
   getActiveOrganization: () => Organization | undefined;
   getActiveRole: () => MemberRole | undefined;
 }
@@ -27,25 +27,15 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       refreshToken: null,
       activeOrganizationId: null,
+      _hasHydrated: false,
 
       setAuth: (user, accessToken, refreshToken) => {
-        // Default active org to the first membership
         const firstOrgId = user.memberships?.[0]?.organizationId ?? null;
         set({ user, accessToken, refreshToken, activeOrganizationId: firstOrgId });
-
-        // Keep localStorage in sync for the axios interceptor
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('accessToken', accessToken);
-          localStorage.setItem('refreshToken', refreshToken);
-        }
       },
 
       setTokens: (accessToken, refreshToken) => {
         set({ accessToken, refreshToken });
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('accessToken', accessToken);
-          localStorage.setItem('refreshToken', refreshToken);
-        }
       },
 
       setActiveOrganization: (orgId) => set({ activeOrganizationId: orgId }),
@@ -54,13 +44,9 @@ export const useAuthStore = create<AuthState>()(
 
       clearAuth: () => {
         set({ user: null, accessToken: null, refreshToken: null, activeOrganizationId: null });
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-        }
       },
 
-      isAuthenticated: () => !!get().accessToken,
+      setHasHydrated: (v) => set({ _hasHydrated: v }),
 
       getActiveOrganization: () => {
         const { user, activeOrganizationId } = get();
@@ -78,8 +64,10 @@ export const useAuthStore = create<AuthState>()(
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
         activeOrganizationId: state.activeOrganizationId,
-        // Don't persist user — always reload from /auth/me for freshness
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     },
   ),
 );

@@ -23,7 +23,7 @@ import { toast } from '@/hooks/use-toast';
 import type { MemberRole } from '@/types';
 
 const ROLES: { value: string; label: string }[] = [
-  { value: '', label: 'All roles' },
+  { value: 'all', label: 'All roles' },
   { value: 'OWNER', label: 'Owner' },
   { value: 'ADMIN', label: 'Admin' },
   { value: 'MANAGER', label: 'Manager' },
@@ -31,7 +31,7 @@ const ROLES: { value: string; label: string }[] = [
 ];
 
 const ACTIVE_OPTIONS = [
-  { value: '', label: 'All statuses' },
+  { value: 'all', label: 'All statuses' },
   { value: 'true', label: 'Active' },
   { value: 'false', label: 'Inactive' },
 ];
@@ -41,18 +41,18 @@ export default function PeoplePage() {
   const { data: me } = useMe();
 
   const [search, setSearch] = useState('');
-  const [role, setRole] = useState('');
-  const [teamId, setTeamId] = useState('');
-  const [departmentId, setDepartmentId] = useState('');
-  const [isActive, setIsActive] = useState('');
+  const [role, setRole] = useState('all');
+  const [teamId, setTeamId] = useState('all');
+  const [departmentId, setDepartmentId] = useState('all');
+  const [isActive, setIsActive] = useState('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const { data: members, isLoading } = useMembers(activeOrganizationId ?? undefined, {
     search: search || undefined,
-    role: (role as MemberRole) || undefined,
-    teamId: teamId || undefined,
-    departmentId: departmentId || undefined,
-    isActive: isActive !== '' ? isActive === 'true' : undefined,
+    role: role !== 'all' ? (role as MemberRole) : undefined,
+    teamId: teamId !== 'all' ? teamId : undefined,
+    departmentId: departmentId !== 'all' ? departmentId : undefined,
+    isActive: isActive !== 'all' ? isActive === 'true' : undefined,
   });
   const { data: teams } = useTeams(activeOrganizationId ?? undefined);
   const { data: departments } = useDepartments(activeOrganizationId ?? undefined);
@@ -128,14 +128,14 @@ export default function PeoplePage() {
         <Select value={departmentId} onValueChange={setDepartmentId}>
           <SelectTrigger className="w-40"><SelectValue placeholder="Department" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All departments</SelectItem>
+            <SelectItem value="all">All departments</SelectItem>
             {departments?.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={teamId} onValueChange={setTeamId}>
           <SelectTrigger className="w-36"><SelectValue placeholder="Team" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All teams</SelectItem>
+            <SelectItem value="all">All teams</SelectItem>
             {teams?.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
           </SelectContent>
         </Select>
