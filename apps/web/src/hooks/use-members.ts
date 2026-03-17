@@ -45,3 +45,12 @@ export function useRemoveMember(orgId: string) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['members', orgId] }),
   });
 }
+
+export function useBulkMemberAction(orgId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userIds, action }: { userIds: string[]; action: 'activate' | 'deactivate' | 'remove' }) =>
+      membersApi.bulk(orgId, userIds, action),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['members', orgId] }),
+  });
+}

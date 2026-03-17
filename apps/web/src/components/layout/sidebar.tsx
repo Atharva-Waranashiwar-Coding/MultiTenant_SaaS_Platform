@@ -15,6 +15,7 @@ import {
   CreditCard,
   Shield,
   BarChart3,
+  UserCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
@@ -32,8 +33,9 @@ const navItems = [
   { href: '/admin',        label: 'Admin Analytics', icon: BarChart3, roles: ['OWNER', 'ADMIN'] },
   { href: '/notifications',label: 'Notifications', icon: Bell },
   // Settings group
-  { href: '/settings',     label: 'Settings',      icon: Settings },
-  { href: '/settings/billing', label: 'Billing',   icon: CreditCard, roles: ['OWNER', 'ADMIN'], indent: true },
+  { href: '/settings',         label: 'Settings',            icon: Settings },
+  { href: '/settings/profile', label: 'Profile',             icon: UserCircle, indent: true },
+  { href: '/settings/billing', label: 'Billing',             icon: CreditCard, roles: ['OWNER', 'ADMIN'], indent: true },
   { href: '/settings/roles',   label: 'Roles & Permissions', icon: Shield, roles: ['OWNER'], indent: true },
   { href: '/audit',        label: 'Audit Log',     icon: ShieldCheck, roles: ['OWNER', 'ADMIN'] },
 ];
@@ -51,7 +53,7 @@ export function Sidebar() {
 
   // Group settings sub-items so we can indent them
   const isSettingsChild = (href: string) =>
-    href === '/settings/billing' || href === '/settings/roles';
+    href === '/settings/profile' || href === '/settings/billing' || href === '/settings/roles';
 
   return (
     <aside className="flex h-full w-60 flex-col bg-sidebar text-sidebar-foreground shrink-0">

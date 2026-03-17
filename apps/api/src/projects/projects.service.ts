@@ -10,6 +10,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { AuditAction, MemberRole, NotificationType, Prisma } from '@prisma/client';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { BulkProjectAction } from './dto/bulk-project-action.dto';
 
 const userSummary = {
   id: true, firstName: true, lastName: true, email: true, avatarUrl: true,
@@ -163,6 +164,28 @@ export class ProjectsService {
     await this.prisma.projectMember.deleteMany({ where: { userId, projectId } });
     await this.audit.log({ action: AuditAction.PROJECT_MEMBER_REMOVED, userId: actorId, organizationId: orgId, targetUserId: userId, meta: { projectId } });
     return { message: 'Member removed from project' };
+  }
+
+  // ── Bulk Archive / Unarchive (Phase 5) ───────────────────────
+  async bulkArchive(orgId: string, actorId: string, projectIds: string[], action: BulkProjectAction) {
+    const membership = await this.requireOrgMember(actorId, orgId);
+    const isAdmin = membership.role === MemberRole.OWNER || membership.role === MemberRole.ADMIN;
+    if (!isAdmin) throw new ForbiddenException('Only OWNER or ADMIN can bulk-archive projects');
+
+    const archive = action === BulkProjectAction.ARCHIVE;
+    await this.prisma.project.updateMany({
+      where: { id: { in: projectIds }, organizationId: orgId },
+      data: { isArchived: archive, archivedAt: archive ? new Date() : null },
+    });
+
+    await this.audit.log({
+      action: archive ? AuditAction.PROJECT_BULK_ARCHIVED : AuditAction.PROJECT_BULK_UNARCHIVED,
+      userId: actorId,
+      organizationId: orgId,
+      meta: { count: projectIds.length, projectIds },
+    });
+
+    return { affected: projectIds.length };
   }
 
   // ── Helpers ───────────────────────────────────────────────────

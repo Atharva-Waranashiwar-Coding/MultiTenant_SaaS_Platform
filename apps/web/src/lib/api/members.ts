@@ -20,4 +20,9 @@ export const membersApi = {
     apiClient
       .delete<{ message: string }>(`/organizations/${orgId}/members/${userId}`)
       .then((r) => r.data),
+
+  bulk: (orgId: string, userIds: string[], action: 'activate' | 'deactivate' | 'remove') =>
+    apiClient
+      .post<{ affected: number }>(`/organizations/${orgId}/members/bulk`, { userIds, action })
+      .then((r) => r.data),
 };

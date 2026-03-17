@@ -4,6 +4,7 @@ import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
+import { BulkTaskActionDto } from './dto/bulk-task-action.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { TaskStatus } from '@prisma/client';
@@ -96,5 +97,17 @@ export class TasksController {
     @Param('commentId') commentId: string,
   ) {
     return this.svc.deleteComment(orgId, taskId, commentId, u.sub);
+  }
+
+  // POST /organizations/:orgId/projects/:projectId/tasks/bulk
+  @Post('bulk')
+  @ApiOperation({ summary: 'Bulk delete, restore, or set status on tasks' })
+  bulkAction(
+    @CurrentUser() u: JwtPayload,
+    @Param('orgId') orgId: string,
+    @Param('projectId') projectId: string,
+    @Body() dto: BulkTaskActionDto,
+  ) {
+    return this.svc.bulkAction(orgId, projectId, u.sub, dto.taskIds, dto.action, dto.status);
   }
 }

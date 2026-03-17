@@ -10,6 +10,13 @@ export const organizationsApi = {
   get: (orgId: string) =>
     apiClient.get<Organization>(`/organizations/${orgId}`).then((r) => r.data),
 
-  update: (orgId: string, data: { name?: string; description?: string; logoUrl?: string }) =>
+  update: (orgId: string, data: {
+    name?: string;
+    description?: string;
+    logoUrl?: string;
+    brandColor?: string;
+    timezone?: string;
+    defaultInviteRole?: string;
+  }) =>
     apiClient.patch<Organization>(`/organizations/${orgId}`, data).then((r) => r.data),
 };

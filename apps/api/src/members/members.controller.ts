@@ -2,6 +2,7 @@ import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } f
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { MembersService } from './members.service';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
+import { BulkMemberActionDto } from './dto/bulk-member-action.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { MemberRole } from '@prisma/client';
@@ -78,5 +79,16 @@ export class MembersController {
     @Param('userId') targetUserId: string,
   ) {
     return this.membersService.remove(user.sub, orgId, targetUserId);
+  }
+
+  // POST /api/v1/organizations/:orgId/members/bulk
+  @Post('bulk')
+  @ApiOperation({ summary: 'Bulk activate, deactivate, or remove members (OWNER/ADMIN)' })
+  bulkAction(
+    @CurrentUser() user: JwtPayload,
+    @Param('orgId') orgId: string,
+    @Body() dto: BulkMemberActionDto,
+  ) {
+    return this.membersService.bulkAction(user.sub, orgId, dto.userIds, dto.action);
   }
 }

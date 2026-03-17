@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -10,6 +11,7 @@ import { AuditAction, NotificationType, TaskStatus } from '@prisma/client';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
+import { BulkTaskAction } from './dto/bulk-task-action.dto';
 
 const userSummary = { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } as const;
 
@@ -177,5 +179,63 @@ export class TasksService {
     if (comment.userId !== actorId) throw new ForbiddenException('You can only delete your own comments');
     await this.prisma.taskComment.delete({ where: { id: commentId } });
     return { message: 'Comment deleted' };
+  }
+
+  // ── Bulk Actions (Phase 5) ────────────────────────────────────
+  async bulkAction(
+    orgId: string,
+    projectId: string,
+    actorId: string,
+    taskIds: string[],
+    action: BulkTaskAction,
+    status?: TaskStatus,
+  ) {
+    await this.getProjectOrFail(projectId, orgId);
+    await this.requireProjectMember(actorId, projectId, orgId);
+
+    // Verify all tasks belong to this project
+    const tasks = await this.prisma.task.findMany({
+      where: { id: { in: taskIds }, projectId },
+    });
+    const validIds = tasks.map((t) => t.id);
+    if (validIds.length === 0) return { affected: 0 };
+
+    if (action === BulkTaskAction.DELETE) {
+      await this.prisma.task.updateMany({
+        where: { id: { in: validIds }, projectId },
+        data: { isDeleted: true, deletedAt: new Date() },
+      });
+      await this.audit.log({
+        action: AuditAction.TASK_BULK_DELETED,
+        userId: actorId,
+        organizationId: orgId,
+        meta: { count: validIds.length, projectId },
+      });
+    } else if (action === BulkTaskAction.RESTORE) {
+      await this.prisma.task.updateMany({
+        where: { id: { in: validIds }, projectId },
+        data: { isDeleted: false, deletedAt: null },
+      });
+      await this.audit.log({
+        action: AuditAction.TASK_BULK_RESTORED,
+        userId: actorId,
+        organizationId: orgId,
+        meta: { count: validIds.length, projectId },
+      });
+    } else if (action === BulkTaskAction.SET_STATUS) {
+      if (!status) throw new BadRequestException('status is required for set_status action');
+      await this.prisma.task.updateMany({
+        where: { id: { in: validIds }, projectId, isDeleted: false },
+        data: { status },
+      });
+      await this.audit.log({
+        action: AuditAction.TASK_BULK_DELETED, // reuse for now; extend enum if needed
+        userId: actorId,
+        organizationId: orgId,
+        meta: { count: validIds.length, projectId, status },
+      });
+    }
+
+    return { affected: validIds.length };
   }
 }

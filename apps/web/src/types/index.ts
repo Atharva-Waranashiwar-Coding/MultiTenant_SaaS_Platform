@@ -26,6 +26,9 @@ export interface Organization {
   slug: string;
   description?: string | null;
   logoUrl?: string | null;
+  brandColor?: string | null;
+  timezone: string;
+  defaultInviteRole: MemberRole;
   createdById: string;
   createdAt: string;
   updatedAt: string;
@@ -294,4 +297,20 @@ export interface TrendMonth {
 
 export interface AnalyticsTrends {
   months: TrendMonth[];
+}
+
+// ── Phase 5 types ──────────────────────────────────────────
+
+export interface Attachment {
+  id: string;
+  organizationId: string;
+  projectId?: string | null;
+  taskId?: string | null;
+  uploadedById: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  storagePath: string;
+  createdAt: string;
+  uploadedBy?: UserSummary;
 }

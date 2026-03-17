@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { BulkProjectActionDto } from './dto/bulk-project-action.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { TenantGuard } from '../common/guards/tenant.guard';
@@ -98,5 +99,16 @@ export class ProjectsController {
     @Param('userId') userId: string,
   ) {
     return this.svc.removeMember(orgId, projectId, u.sub, userId);
+  }
+
+  // POST /api/v1/organizations/:orgId/projects/bulk
+  @Post('bulk')
+  @ApiOperation({ summary: 'Bulk archive or unarchive projects (OWNER/ADMIN)' })
+  bulkAction(
+    @CurrentUser() u: JwtPayload,
+    @Param('orgId') orgId: string,
+    @Body() dto: BulkProjectActionDto,
+  ) {
+    return this.svc.bulkArchive(orgId, u.sub, dto.projectIds, dto.action);
   }
 }

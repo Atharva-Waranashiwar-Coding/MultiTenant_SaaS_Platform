@@ -40,7 +40,7 @@ export function useCreateOrganization() {
 export function useUpdateOrganization(orgId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { name?: string; description?: string; logoUrl?: string }) =>
+    mutationFn: (data: Parameters<typeof organizationsApi.update>[1]) =>
       organizationsApi.update(orgId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['organization', orgId] });

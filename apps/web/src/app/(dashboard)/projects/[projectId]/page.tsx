@@ -19,6 +19,7 @@ import { ProjectStatusBadge, TaskStatusBadge, PriorityBadge } from '@/components
 import { EmptyState } from '@/components/ui/empty-state';
 import { getInitials, getApiErrorMessage } from '@/lib/utils';
 import type { TaskStatus, Priority } from '@/types';
+import { AttachmentPanel } from '@/components/ui/attachment-panel';
 import { ArrowLeft, Archive, ArchiveRestore, UserPlus, Trash2, Plus, CheckSquare, Calendar } from 'lucide-react';
 
 const TASK_STATUSES: TaskStatus[] = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE', 'CANCELLED'];
@@ -231,6 +232,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
           )}
         </CardContent>
       </Card>
+
+      {/* Attachments */}
+      <AttachmentPanel
+        orgId={activeOrganizationId!}
+        projectId={projectId}
+        canUpload={canEdit}
+      />
 
       {/* Members */}
       <Card>

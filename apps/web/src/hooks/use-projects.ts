@@ -66,3 +66,12 @@ export function useRemoveProjectMember(orgId: string, projectId: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['project', orgId, projectId] }),
   });
 }
+
+export function useBulkProjectAction(orgId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ projectIds, action }: { projectIds: string[]; action: 'archive' | 'unarchive' }) =>
+      projectsApi.bulk(orgId, projectIds, action),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', orgId] }),
+  });
+}

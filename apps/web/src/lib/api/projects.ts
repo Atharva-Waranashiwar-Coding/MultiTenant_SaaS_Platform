@@ -39,4 +39,9 @@ export const projectsApi = {
 
   removeMember: (orgId: string, projectId: string, userId: string) =>
     apiClient.delete(`/organizations/${orgId}/projects/${projectId}/members/${userId}`).then((r) => r.data),
+
+  bulk: (orgId: string, projectIds: string[], action: 'archive' | 'unarchive') =>
+    apiClient
+      .post<{ affected: number }>(`/organizations/${orgId}/projects/bulk`, { projectIds, action })
+      .then((r) => r.data),
 };

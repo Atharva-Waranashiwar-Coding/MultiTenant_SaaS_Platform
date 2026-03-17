@@ -18,6 +18,8 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { PermissionsModule } from './permissions/permissions.module';
 // Phase 4
 import { AnalyticsModule } from './analytics/analytics.module';
+// Phase 5
+import { AttachmentsModule } from './attachments/attachments.module';
 
 @Module({
   imports: [
@@ -40,6 +42,8 @@ import { AnalyticsModule } from './analytics/analytics.module';
     PermissionsModule,
     // Phase 4
     AnalyticsModule,
+    // Phase 5
+    AttachmentsModule,
   ],
 })
 export class AppModule {}

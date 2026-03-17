@@ -9,6 +9,7 @@ import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AuditAction, MemberRole, NotificationType, Prisma } from '@prisma/client';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
+import { BulkMemberAction } from './dto/bulk-member-action.dto';
 
 @Injectable()
 export class MembersService {
@@ -186,6 +187,67 @@ export class MembersService {
 
     await this.auditService.log({ action: AuditAction.MEMBER_REMOVED, userId: actorId, organizationId, targetUserId });
     return { message: 'Member removed successfully' };
+  }
+
+  // ── Bulk Actions (Phase 5) ────────────────────────────────
+  async bulkAction(actorId: string, organizationId: string, userIds: string[], action: BulkMemberAction) {
+    const actor = await this.requireMembership(actorId, organizationId);
+    if (actor.role !== MemberRole.OWNER && actor.role !== MemberRole.ADMIN) {
+      throw new ForbiddenException('Only OWNER or ADMIN can perform bulk member actions');
+    }
+
+    // Exclude self + exclude OWNERs from the target set
+    const targets = await this.prisma.membership.findMany({
+      where: {
+        organizationId,
+        userId: { in: userIds },
+        NOT: [{ userId: actorId }, { role: MemberRole.OWNER }],
+      },
+    });
+
+    if (targets.length === 0) return { affected: 0 };
+
+    const targetUserIds = targets.map((t) => t.userId);
+
+    if (action === BulkMemberAction.ACTIVATE) {
+      await this.prisma.membership.updateMany({
+        where: { organizationId, userId: { in: targetUserIds } },
+        data: { isActive: true },
+      });
+      await this.auditService.log({
+        action: AuditAction.MEMBER_BULK_ACTIVATED,
+        userId: actorId,
+        organizationId,
+        meta: { count: targetUserIds.length, userIds: targetUserIds },
+      });
+    } else if (action === BulkMemberAction.DEACTIVATE) {
+      await this.prisma.membership.updateMany({
+        where: { organizationId, userId: { in: targetUserIds } },
+        data: { isActive: false },
+      });
+      await this.auditService.log({
+        action: AuditAction.MEMBER_BULK_DEACTIVATED,
+        userId: actorId,
+        organizationId,
+        meta: { count: targetUserIds.length, userIds: targetUserIds },
+      });
+    } else if (action === BulkMemberAction.REMOVE) {
+      // Only OWNER can bulk-remove (ADMIN cannot remove OWNER; we filtered OWNERs above)
+      if (actor.role !== MemberRole.OWNER && actor.role !== MemberRole.ADMIN) {
+        throw new ForbiddenException('Insufficient permissions for bulk removal');
+      }
+      await this.prisma.membership.deleteMany({
+        where: { organizationId, userId: { in: targetUserIds } },
+      });
+      await this.auditService.log({
+        action: AuditAction.MEMBER_BULK_REMOVED,
+        userId: actorId,
+        organizationId,
+        meta: { count: targetUserIds.length, userIds: targetUserIds },
+      });
+    }
+
+    return { affected: targetUserIds.length };
   }
 
   private async requireMembership(userId: string, organizationId: string) {

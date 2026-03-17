@@ -22,6 +22,9 @@ export const authApi = {
   resetPassword: (token: string, password: string) =>
     apiClient.post<{ message: string }>('/auth/reset-password', { token, password }).then((r) => r.data),
 
+  updateMe: (data: { firstName?: string; lastName?: string; avatarUrl?: string }) =>
+    apiClient.patch<User>('/users/me', data).then((r) => r.data),
+
   verifyEmail: (token: string) =>
     apiClient.get<{ message: string }>(`/auth/verify-email?token=${token}`).then((r) => r.data),
 
