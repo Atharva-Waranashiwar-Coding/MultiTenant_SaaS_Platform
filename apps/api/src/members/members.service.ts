@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { AuditAction, MemberRole } from '@prisma/client';
+import { AuditAction, MemberRole, Prisma } from '@prisma/client';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 
 @Injectable()
@@ -16,40 +16,105 @@ export class MembersService {
     private auditService: AuditService,
   ) {}
 
-  // List all members of an organization
-  findAll(organizationId: string) {
+  // ── List members with search + filter (Phase 2 extension) ────
+  findAll(
+    organizationId: string,
+    query?: {
+      search?: string;
+      role?: MemberRole;
+      teamId?: string;
+      departmentId?: string;
+      isActive?: boolean;
+    },
+  ) {
+    const where: Prisma.MembershipWhereInput = { organizationId };
+
+    if (query?.role) where.role = query.role;
+    if (query?.isActive !== undefined) where.isActive = query.isActive;
+
+    if (query?.search) {
+      where.user = {
+        OR: [
+          { firstName: { contains: query.search, mode: 'insensitive' } },
+          { lastName: { contains: query.search, mode: 'insensitive' } },
+          { email: { contains: query.search, mode: 'insensitive' } },
+        ],
+      };
+    }
+
+    // Filter by team or department — membership in those
+    if (query?.teamId) {
+      where.user = {
+        ...((where.user as Prisma.UserWhereInput) ?? {}),
+        teamMembers: { some: { teamId: query.teamId } },
+      };
+    }
+    if (query?.departmentId) {
+      where.user = {
+        ...((where.user as Prisma.UserWhereInput) ?? {}),
+        departmentMembers: { some: { departmentId: query.departmentId } },
+      };
+    }
+
     return this.prisma.membership.findMany({
-      where: { organizationId },
+      where,
       include: {
         user: {
-          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatarUrl: true,
+            createdAt: true,
+            teamMembers: { select: { team: { select: { id: true, name: true } }, isLead: true } },
+            departmentMembers: { select: { department: { select: { id: true, name: true } }, isLead: true } },
+          },
         },
       },
       orderBy: { joinedAt: 'asc' },
     });
   }
 
-  // Change a member's role
-  async updateRole(
-    actorId: string,
-    organizationId: string,
-    targetUserId: string,
-    dto: UpdateMemberRoleDto,
-  ) {
+  // ── Get single member detail ──────────────────────────────────
+  async findOne(organizationId: string, userId: string) {
+    const membership = await this.prisma.membership.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatarUrl: true,
+            isEmailVerified: true,
+            createdAt: true,
+            teamMembers: {
+              include: { team: { select: { id: true, name: true } } },
+            },
+            departmentMembers: {
+              include: { department: { select: { id: true, name: true } } },
+            },
+          },
+        },
+      },
+    });
+    if (!membership) throw new NotFoundException('Member not found');
+    return membership;
+  }
+
+  // ── Change role ───────────────────────────────────────────────
+  async updateRole(actorId: string, organizationId: string, targetUserId: string, dto: UpdateMemberRoleDto) {
     const actorMembership = await this.requireMembership(actorId, organizationId);
     const targetMembership = await this.requireMembership(targetUserId, organizationId);
 
-    // Only OWNER or ADMIN can change roles
     if (actorMembership.role !== MemberRole.OWNER && actorMembership.role !== MemberRole.ADMIN) {
       throw new ForbiddenException('Only OWNER or ADMIN can change roles');
     }
-
-    // Cannot demote/change an OWNER unless you are also an OWNER
     if (targetMembership.role === MemberRole.OWNER && actorMembership.role !== MemberRole.OWNER) {
-      throw new ForbiddenException('Only another OWNER can change an OWNER\'s role');
+      throw new ForbiddenException("Only another OWNER can change an OWNER's role");
     }
-
-    // Cannot promote someone to OWNER (handled by ownership transfer in Phase 2)
     if (dto.role === MemberRole.OWNER) {
       throw new BadRequestException('Cannot assign OWNER role directly. Use ownership transfer.');
     }
@@ -57,38 +122,47 @@ export class MembersService {
     const updated = await this.prisma.membership.update({
       where: { userId_organizationId: { userId: targetUserId, organizationId } },
       data: { role: dto.role },
-      include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true } },
-      },
+      include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } },
+    });
+
+    await this.auditService.log({ action: AuditAction.MEMBER_ROLE_CHANGED, userId: actorId, organizationId, targetUserId, meta: { from: targetMembership.role, to: dto.role } });
+    return updated;
+  }
+
+  // ── Activate / Deactivate (Phase 2) ──────────────────────────
+  async setActive(actorId: string, organizationId: string, targetUserId: string, isActive: boolean) {
+    const actorMembership = await this.requireMembership(actorId, organizationId);
+    const targetMembership = await this.requireMembership(targetUserId, organizationId);
+
+    if (actorMembership.role !== MemberRole.OWNER && actorMembership.role !== MemberRole.ADMIN) {
+      throw new ForbiddenException('Only OWNER or ADMIN can activate/deactivate members');
+    }
+    if (targetMembership.role === MemberRole.OWNER) {
+      throw new ForbiddenException('Cannot deactivate an OWNER');
+    }
+
+    const updated = await this.prisma.membership.update({
+      where: { userId_organizationId: { userId: targetUserId, organizationId } },
+      data: { isActive },
     });
 
     await this.auditService.log({
-      action: AuditAction.MEMBER_ROLE_CHANGED,
+      action: isActive ? AuditAction.MEMBER_ACTIVATED : AuditAction.MEMBER_DEACTIVATED,
       userId: actorId,
       organizationId,
       targetUserId,
-      meta: { from: targetMembership.role, to: dto.role },
     });
 
     return updated;
   }
 
-  // Remove a member from the organization
+  // ── Remove ────────────────────────────────────────────────────
   async remove(actorId: string, organizationId: string, targetUserId: string) {
     const actorMembership = await this.requireMembership(actorId, organizationId);
     const targetMembership = await this.requireMembership(targetUserId, organizationId);
 
-    // Cannot remove yourself (use a leave endpoint in Phase 2)
-    if (actorId === targetUserId) {
-      throw new BadRequestException('Cannot remove yourself. Use leave organization.');
-    }
-
-    // Cannot remove an OWNER
-    if (targetMembership.role === MemberRole.OWNER) {
-      throw new ForbiddenException('Cannot remove an organization OWNER');
-    }
-
-    // ADMIN can remove MEMBER/MANAGER; OWNER can remove anyone
+    if (actorId === targetUserId) throw new BadRequestException('Cannot remove yourself.');
+    if (targetMembership.role === MemberRole.OWNER) throw new ForbiddenException('Cannot remove an organization OWNER');
     if (actorMembership.role === MemberRole.MEMBER || actorMembership.role === MemberRole.MANAGER) {
       throw new ForbiddenException('Insufficient permissions to remove members');
     }
@@ -97,21 +171,15 @@ export class MembersService {
       where: { userId_organizationId: { userId: targetUserId, organizationId } },
     });
 
-    await this.auditService.log({
-      action: AuditAction.MEMBER_REMOVED,
-      userId: actorId,
-      organizationId,
-      targetUserId,
-    });
-
+    await this.auditService.log({ action: AuditAction.MEMBER_REMOVED, userId: actorId, organizationId, targetUserId });
     return { message: 'Member removed successfully' };
   }
 
   private async requireMembership(userId: string, organizationId: string) {
-    const membership = await this.prisma.membership.findUnique({
+    const m = await this.prisma.membership.findUnique({
       where: { userId_organizationId: { userId, organizationId } },
     });
-    if (!membership) throw new NotFoundException('Membership not found');
-    return membership;
+    if (!m) throw new NotFoundException('Membership not found');
+    return m;
   }
 }

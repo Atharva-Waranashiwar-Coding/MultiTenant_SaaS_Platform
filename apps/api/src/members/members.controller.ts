@@ -1,9 +1,10 @@
-import { Controller, Get, Patch, Delete, Body, Param } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { MembersService } from './members.service';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { MemberRole } from '@prisma/client';
 
 @ApiTags('Members')
 @ApiBearerAuth('access-token')
@@ -12,15 +13,40 @@ export class MembersController {
   constructor(private readonly membersService: MembersService) {}
 
   // GET /api/v1/organizations/:orgId/members
+  // Phase 2: added search, role, teamId, departmentId, isActive query params
   @Get()
-  @ApiOperation({ summary: 'List all members of an organization' })
-  findAll(@Param('orgId') orgId: string) {
-    return this.membersService.findAll(orgId);
+  @ApiOperation({ summary: 'List members with search and filter' })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'role', required: false, enum: MemberRole })
+  @ApiQuery({ name: 'teamId', required: false })
+  @ApiQuery({ name: 'departmentId', required: false })
+  @ApiQuery({ name: 'isActive', required: false, type: Boolean })
+  findAll(
+    @Param('orgId') orgId: string,
+    @Query('search') search?: string,
+    @Query('role') role?: MemberRole,
+    @Query('teamId') teamId?: string,
+    @Query('departmentId') departmentId?: string,
+    @Query('isActive') isActive?: string,
+  ) {
+    return this.membersService.findAll(orgId, {
+      search,
+      role,
+      teamId,
+      departmentId,
+      isActive: isActive !== undefined ? isActive === 'true' : undefined,
+    });
   }
 
-  // PATCH /api/v1/organizations/:orgId/members/:userId/role
+  // GET /api/v1/organizations/:orgId/members/:userId
+  @Get(':userId')
+  @ApiOperation({ summary: 'Get member detail' })
+  findOne(@Param('orgId') orgId: string, @Param('userId') userId: string) {
+    return this.membersService.findOne(orgId, userId);
+  }
+
   @Patch(':userId/role')
-  @ApiOperation({ summary: 'Change a member role (OWNER/ADMIN only)' })
+  @ApiOperation({ summary: 'Change a member role (OWNER/ADMIN)' })
   updateRole(
     @CurrentUser() user: JwtPayload,
     @Param('orgId') orgId: string,
@@ -30,9 +56,20 @@ export class MembersController {
     return this.membersService.updateRole(user.sub, orgId, targetUserId, dto);
   }
 
-  // DELETE /api/v1/organizations/:orgId/members/:userId
+  // PATCH /api/v1/organizations/:orgId/members/:userId/status
+  @Patch(':userId/status')
+  @ApiOperation({ summary: 'Activate or deactivate a member (OWNER/ADMIN)' })
+  setStatus(
+    @CurrentUser() user: JwtPayload,
+    @Param('orgId') orgId: string,
+    @Param('userId') targetUserId: string,
+    @Body('isActive') isActive: boolean,
+  ) {
+    return this.membersService.setActive(user.sub, orgId, targetUserId, isActive);
+  }
+
   @Delete(':userId')
-  @ApiOperation({ summary: 'Remove a member from the organization (OWNER/ADMIN only)' })
+  @ApiOperation({ summary: 'Remove a member from the organization' })
   remove(
     @CurrentUser() user: JwtPayload,
     @Param('orgId') orgId: string,

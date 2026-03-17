@@ -1,6 +1,6 @@
 // ============================================================
 // Prisma Schema - MultiTenant SaaS Admin Platform
-// Phase 1: Core Auth, Tenancy, Members, Invitations, Audit
+// Phase 2: Teams, Departments, Projects, Tasks
 // ============================================================
 
 generator client {
@@ -30,7 +30,34 @@ enum InvitationStatus {
   REVOKED
 }
 
+// Phase 2: project lifecycle
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+// Phase 2: task kanban states
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  CANCELLED
+}
+
+// Phase 2: shared priority scale for projects + tasks
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
 enum AuditAction {
+  // ── Phase 1 ────────────────────────
   USER_SIGNUP
   USER_LOGIN
   USER_LOGOUT
@@ -45,39 +72,69 @@ enum AuditAction {
   MEMBER_REMOVED
   MEMBER_ROLE_CHANGED
   MEMBER_JOINED
+  // ── Phase 2 ────────────────────────
+  MEMBER_ACTIVATED
+  MEMBER_DEACTIVATED
+  DEPARTMENT_CREATED
+  DEPARTMENT_UPDATED
+  DEPARTMENT_DELETED
+  DEPARTMENT_MEMBER_ADDED
+  DEPARTMENT_MEMBER_REMOVED
+  TEAM_CREATED
+  TEAM_UPDATED
+  TEAM_DELETED
+  TEAM_MEMBER_ADDED
+  TEAM_MEMBER_REMOVED
+  PROJECT_CREATED
+  PROJECT_UPDATED
+  PROJECT_ARCHIVED
+  PROJECT_UNARCHIVED
+  PROJECT_MEMBER_ADDED
+  PROJECT_MEMBER_REMOVED
+  TASK_CREATED
+  TASK_UPDATED
+  TASK_STATUS_CHANGED
+  TASK_DELETED
+  TASK_ASSIGNED
+  TASK_COMMENT_ADDED
 }
 
 // ─────────────────────────────────────────────
 // USER
-// Global entity — not scoped to any tenant.
-// A user can belong to many organizations.
 // ─────────────────────────────────────────────
 model User {
-  id                String    @id @default(uuid())
-  email             String    @unique
-  passwordHash      String
-  firstName         String
-  lastName          String
-  avatarUrl         String?
-  isEmailVerified   Boolean   @default(false)
-  emailVerifyToken  String?   @unique
-  resetPasswordToken     String?   @unique
+  id                          String    @id @default(uuid())
+  email                       String    @unique
+  passwordHash                String
+  firstName                   String
+  lastName                    String
+  avatarUrl                   String?
+  isEmailVerified             Boolean   @default(false)
+  emailVerifyToken            String?   @unique
+  resetPasswordToken          String?   @unique
   resetPasswordTokenExpiresAt DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
 
-  // Relations
-  memberships       Membership[]
-  sentInvitations   Invitation[]    @relation("InvitedBy")
-  refreshTokens     RefreshToken[]
-  auditLogs         AuditLog[]
+  memberships         Membership[]
+  sentInvitations     Invitation[]     @relation("InvitedBy")
+  refreshTokens       RefreshToken[]
+  auditLogs           AuditLog[]
+  // Phase 2
+  departmentMembers   DepartmentMember[]
+  teamMembers         TeamMember[]
+  ownedProjects       Project[]        @relation("ProjectOwner")
+  createdProjects     Project[]        @relation("ProjectCreatedBy")
+  projectMembers      ProjectMember[]
+  assignedTasks       Task[]           @relation("TaskAssignee")
+  createdTasks        Task[]           @relation("TaskCreatedBy")
+  taskComments        TaskComment[]
 
   @@map("users")
 }
 
 // ─────────────────────────────────────────────
 // REFRESH TOKEN
-// Stored server-side for rotation & revocation.
 // ─────────────────────────────────────────────
 model RefreshToken {
   id        String   @id @default(uuid())
@@ -94,42 +151,43 @@ model RefreshToken {
 
 // ─────────────────────────────────────────────
 // ORGANIZATION (Tenant)
-// The central multi-tenant entity.
-// Each org is a separate workspace.
 // ─────────────────────────────────────────────
 model Organization {
   id          String   @id @default(uuid())
   name        String
-  slug        String   @unique  // URL-friendly identifier
+  slug        String   @unique
   description String?
   logoUrl     String?
   createdById String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  // Relations
   memberships Membership[]
   invitations Invitation[]
   auditLogs   AuditLog[]
+  // Phase 2
+  departments Department[]
+  teams       Team[]
+  projects    Project[]
 
   @@map("organizations")
 }
 
 // ─────────────────────────────────────────────
 // MEMBERSHIP
-// Join table: User ↔ Organization with role.
-// One user can have one role per organization.
+// Phase 2 adds: isActive for activate/deactivate
 // ─────────────────────────────────────────────
 model Membership {
-  id             String      @id @default(uuid())
+  id             String     @id @default(uuid())
   userId         String
   organizationId String
-  role           MemberRole  @default(MEMBER)
-  joinedAt       DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  role           MemberRole @default(MEMBER)
+  isActive       Boolean    @default(true)
+  joinedAt       DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([userId, organizationId])
   @@map("memberships")
@@ -137,8 +195,6 @@ model Membership {
 
 // ─────────────────────────────────────────────
 // INVITATION
-// Tracks email invites sent to join an org.
-// Can be accepted, revoked, or expired.
 // ─────────────────────────────────────────────
 model Invitation {
   id             String           @id @default(uuid())
@@ -147,36 +203,207 @@ model Invitation {
   invitedById    String
   role           MemberRole       @default(MEMBER)
   status         InvitationStatus @default(PENDING)
-  token          String           @unique  // secure token for accept URL
+  token          String           @unique
   expiresAt      DateTime
   acceptedAt     DateTime?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  invitedBy      User         @relation("InvitedBy", fields: [invitedById], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy    User         @relation("InvitedBy", fields: [invitedById], references: [id])
 
   @@map("invitations")
 }
 
 // ─────────────────────────────────────────────
+// DEPARTMENT
+// A logical grouping of members within an org.
+// ─────────────────────────────────────────────
+model Department {
+  id             String   @id @default(uuid())
+  name           String
+  description    String?
+  organizationId String
+  createdById    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members      DepartmentMember[]
+  teams        Team[]
+
+  @@unique([name, organizationId])
+  @@map("departments")
+}
+
+// ─────────────────────────────────────────────
+// DEPARTMENT MEMBER
+// Join: User ↔ Department, one user can lead it
+// ─────────────────────────────────────────────
+model DepartmentMember {
+  id           String   @id @default(uuid())
+  userId       String
+  departmentId String
+  isLead       Boolean  @default(false)
+  joinedAt     DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, departmentId])
+  @@map("department_members")
+}
+
+// ─────────────────────────────────────────────
+// TEAM
+// A cross-functional group within an org.
+// Optionally belongs to a department.
+// ─────────────────────────────────────────────
+model Team {
+  id             String   @id @default(uuid())
+  name           String
+  description    String?
+  organizationId String
+  departmentId   String?  // optional: team can sit under a department
+  createdById    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department   Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  members      TeamMember[]
+
+  @@unique([name, organizationId])
+  @@map("teams")
+}
+
+// ─────────────────────────────────────────────
+// TEAM MEMBER
+// Join: User ↔ Team, one user can be the lead
+// ─────────────────────────────────────────────
+model TeamMember {
+  id       String   @id @default(uuid())
+  userId   String
+  teamId   String
+  isLead   Boolean  @default(false)
+  joinedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, teamId])
+  @@map("team_members")
+}
+
+// ─────────────────────────────────────────────
+// PROJECT
+// Work container scoped to an organization.
+// ─────────────────────────────────────────────
+model Project {
+  id             String        @id @default(uuid())
+  name           String
+  description    String?
+  status         ProjectStatus @default(ACTIVE)
+  priority       Priority      @default(MEDIUM)
+  dueDate        DateTime?
+  tags           String[]
+  organizationId String
+  ownerId        String
+  createdById    String
+  isArchived     Boolean       @default(false)
+  archivedAt     DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner        User           @relation("ProjectOwner", fields: [ownerId], references: [id])
+  createdBy    User           @relation("ProjectCreatedBy", fields: [createdById], references: [id])
+  members      ProjectMember[]
+  tasks        Task[]
+
+  @@map("projects")
+}
+
+// ─────────────────────────────────────────────
+// PROJECT MEMBER
+// People assigned to collaborate on a project
+// ─────────────────────────────────────────────
+model ProjectMember {
+  id        String   @id @default(uuid())
+  userId    String
+  projectId String
+  joinedAt  DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId])
+  @@map("project_members")
+}
+
+// ─────────────────────────────────────────────
+// TASK
+// A unit of work within a project.
+// Soft-deleted via isDeleted flag.
+// ─────────────────────────────────────────────
+model Task {
+  id          String     @id @default(uuid())
+  title       String
+  description String?
+  status      TaskStatus @default(TODO)
+  priority    Priority   @default(MEDIUM)
+  dueDate     DateTime?
+  tags        String[]
+  projectId   String
+  assigneeId  String?
+  createdById String
+  isDeleted   Boolean    @default(false)
+  deletedAt   DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  project   Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee  User?        @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  createdBy User         @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  comments  TaskComment[]
+
+  @@map("tasks")
+}
+
+// ─────────────────────────────────────────────
+// TASK COMMENT
+// Simple threaded comment on a task.
+// ─────────────────────────────────────────────
+model TaskComment {
+  id        String   @id @default(uuid())
+  content   String
+  taskId    String
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("task_comments")
+}
+
+// ─────────────────────────────────────────────
 // AUDIT LOG
-// Immutable record of key platform actions.
-// Scoped per user and optionally per org.
 // ─────────────────────────────────────────────
 model AuditLog {
   id             String      @id @default(uuid())
   action         AuditAction
-  userId         String?     // null for anonymous actions
-  organizationId String?     // null for global actions (e.g. signup)
-  targetUserId   String?     // e.g. who was invited / removed
-  meta           Json?       // arbitrary extra context
+  userId         String?
+  organizationId String?
+  targetUserId   String?
+  meta           Json?
   ipAddress      String?
   userAgent      String?
   createdAt      DateTime    @default(now())
 
-  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
-  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   @@map("audit_logs")
 }

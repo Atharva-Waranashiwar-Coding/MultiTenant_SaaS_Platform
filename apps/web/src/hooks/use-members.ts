@@ -4,11 +4,28 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { membersApi } from '@/lib/api/members';
 import type { MemberRole } from '@/types';
 
-export function useMembers(orgId?: string) {
+export function useMembers(orgId?: string, query?: { search?: string; role?: MemberRole; teamId?: string; departmentId?: string; isActive?: boolean }) {
   return useQuery({
-    queryKey: ['members', orgId],
-    queryFn: () => membersApi.list(orgId!),
+    queryKey: ['members', orgId, query],
+    queryFn: () => membersApi.list(orgId!, query),
     enabled: !!orgId,
+  });
+}
+
+export function useMember(orgId?: string, userId?: string) {
+  return useQuery({
+    queryKey: ['member', orgId, userId],
+    queryFn: () => membersApi.get(orgId!, userId!),
+    enabled: !!orgId && !!userId,
+  });
+}
+
+export function useSetMemberActive(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, isActive }: { userId: string; isActive: boolean }) =>
+      membersApi.setActive(orgId, userId, isActive),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['members', orgId] }),
   });
 }
 
