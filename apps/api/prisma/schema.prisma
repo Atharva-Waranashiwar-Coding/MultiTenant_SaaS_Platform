@@ -1,0 +1,182 @@
+// ============================================================
+// Prisma Schema - MultiTenant SaaS Admin Platform
+// Phase 1: Core Auth, Tenancy, Members, Invitations, Audit
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MANAGER
+  MEMBER
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+enum AuditAction {
+  USER_SIGNUP
+  USER_LOGIN
+  USER_LOGOUT
+  USER_PASSWORD_RESET_REQUEST
+  USER_PASSWORD_RESET_COMPLETE
+  USER_EMAIL_VERIFIED
+  ORG_CREATED
+  ORG_UPDATED
+  MEMBER_INVITED
+  MEMBER_INVITATION_ACCEPTED
+  MEMBER_INVITATION_REVOKED
+  MEMBER_REMOVED
+  MEMBER_ROLE_CHANGED
+  MEMBER_JOINED
+}
+
+// ─────────────────────────────────────────────
+// USER
+// Global entity — not scoped to any tenant.
+// A user can belong to many organizations.
+// ─────────────────────────────────────────────
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  passwordHash      String
+  firstName         String
+  lastName          String
+  avatarUrl         String?
+  isEmailVerified   Boolean   @default(false)
+  emailVerifyToken  String?   @unique
+  resetPasswordToken     String?   @unique
+  resetPasswordTokenExpiresAt DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  memberships       Membership[]
+  sentInvitations   Invitation[]    @relation("InvitedBy")
+  refreshTokens     RefreshToken[]
+  auditLogs         AuditLog[]
+
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────
+// REFRESH TOKEN
+// Stored server-side for rotation & revocation.
+// ─────────────────────────────────────────────
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// ─────────────────────────────────────────────
+// ORGANIZATION (Tenant)
+// The central multi-tenant entity.
+// Each org is a separate workspace.
+// ─────────────────────────────────────────────
+model Organization {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique  // URL-friendly identifier
+  description String?
+  logoUrl     String?
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  memberships Membership[]
+  invitations Invitation[]
+  auditLogs   AuditLog[]
+
+  @@map("organizations")
+}
+
+// ─────────────────────────────────────────────
+// MEMBERSHIP
+// Join table: User ↔ Organization with role.
+// One user can have one role per organization.
+// ─────────────────────────────────────────────
+model Membership {
+  id             String      @id @default(uuid())
+  userId         String
+  organizationId String
+  role           MemberRole  @default(MEMBER)
+  joinedAt       DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@map("memberships")
+}
+
+// ─────────────────────────────────────────────
+// INVITATION
+// Tracks email invites sent to join an org.
+// Can be accepted, revoked, or expired.
+// ─────────────────────────────────────────────
+model Invitation {
+  id             String           @id @default(uuid())
+  email          String
+  organizationId String
+  invitedById    String
+  role           MemberRole       @default(MEMBER)
+  status         InvitationStatus @default(PENDING)
+  token          String           @unique  // secure token for accept URL
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy      User         @relation("InvitedBy", fields: [invitedById], references: [id])
+
+  @@map("invitations")
+}
+
+// ─────────────────────────────────────────────
+// AUDIT LOG
+// Immutable record of key platform actions.
+// Scoped per user and optionally per org.
+// ─────────────────────────────────────────────
+model AuditLog {
+  id             String      @id @default(uuid())
+  action         AuditAction
+  userId         String?     // null for anonymous actions
+  organizationId String?     // null for global actions (e.g. signup)
+  targetUserId   String?     // e.g. who was invited / removed
+  meta           Json?       // arbitrary extra context
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime    @default(now())
+
+  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}
