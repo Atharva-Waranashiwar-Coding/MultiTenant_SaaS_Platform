@@ -7,8 +7,9 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
-import { AuditAction, InvitationStatus, MemberRole } from '@prisma/client';
+import { AuditAction, InvitationStatus, MemberRole, NotificationType } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 
 const INVITATION_EXPIRES_IN_DAYS = 7;
@@ -18,6 +19,7 @@ export class InvitationsService {
   constructor(
     private prisma: PrismaService,
     private auditService: AuditService,
+    private notifications: NotificationsService,
   ) {}
 
   // Invite a user by email to join an organization
@@ -132,6 +134,22 @@ export class InvitationsService {
       userId,
       organizationId: invitation.organizationId,
     });
+
+    // Notify the inviter that their invitation was accepted
+    const acceptingUser = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { firstName: true, lastName: true, email: true },
+    });
+    if (acceptingUser) {
+      await this.notifications.notify({
+        userId: invitation.invitedById,
+        orgId: invitation.organizationId,
+        type: NotificationType.INVITE_ACCEPTED,
+        title: 'Invitation accepted',
+        body: `${acceptingUser.firstName} ${acceptingUser.lastName} accepted your invitation and joined the organization.`,
+        meta: { acceptedByUserId: userId },
+      });
+    }
 
     return membership;
   }

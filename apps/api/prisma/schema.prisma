@@ -97,6 +97,40 @@ enum AuditAction {
   TASK_DELETED
   TASK_ASSIGNED
   TASK_COMMENT_ADDED
+  // ── Phase 3 ────────────────────────
+  PERMISSION_OVERRIDE_CREATED
+  PERMISSION_OVERRIDE_DELETED
+  SUBSCRIPTION_PLAN_CHANGED
+}
+
+// ─────────────────────────────────────────────
+// Phase 3: subscription plan tiers
+// ─────────────────────────────────────────────
+enum SubscriptionPlan {
+  FREE
+  STARTER
+  GROWTH
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+// ─────────────────────────────────────────────
+// Phase 3: notification event types
+// ─────────────────────────────────────────────
+enum NotificationType {
+  INVITE_ACCEPTED
+  MEMBER_ADDED
+  MEMBER_ROLE_CHANGED
+  PROJECT_ASSIGNED
+  TASK_ASSIGNED
+  TASK_DUE_SOON
 }
 
 // ─────────────────────────────────────────────
@@ -129,6 +163,8 @@ model User {
   assignedTasks       Task[]           @relation("TaskAssignee")
   createdTasks        Task[]           @relation("TaskCreatedBy")
   taskComments        TaskComment[]
+  // Phase 3
+  notifications       Notification[]
 
   @@map("users")
 }
@@ -169,6 +205,10 @@ model Organization {
   departments Department[]
   teams       Team[]
   projects    Project[]
+  // Phase 3
+  subscription            Subscription?
+  notifications           Notification[]
+  rolePermissionOverrides RolePermissionOverride[]
 
   @@map("organizations")
 }
@@ -386,6 +426,72 @@ model TaskComment {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("task_comments")
+}
+
+// ─────────────────────────────────────────────
+// SUBSCRIPTION
+// Phase 3: billing-ready plan & feature tracking.
+// No real payment processor — schema & logic only.
+// ─────────────────────────────────────────────
+model Subscription {
+  id                 String             @id @default(uuid())
+  organizationId     String             @unique
+  plan               SubscriptionPlan   @default(FREE)
+  status             SubscriptionStatus @default(ACTIVE)
+  seatLimit          Int                @default(5)
+  trialStartAt       DateTime?
+  trialEndAt         DateTime?
+  billingEmail       String?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  features           Json               @default("{}")
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+// ─────────────────────────────────────────────
+// NOTIFICATION
+// Phase 3: in-app notification feed per user.
+// ─────────────────────────────────────────────
+model Notification {
+  id             String           @id @default(uuid())
+  userId         String
+  organizationId String
+  type           NotificationType
+  title          String
+  body           String
+  meta           Json?
+  isRead         Boolean          @default(false)
+  readAt         DateTime?
+  createdAt      DateTime         @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// ─────────────────────────────────────────────
+// ROLE PERMISSION OVERRIDE
+// Phase 3: per-org customization of which
+// permissions each base role has.
+// ─────────────────────────────────────────────
+model RolePermissionOverride {
+  id             String     @id @default(uuid())
+  organizationId String
+  role           MemberRole
+  permission     String     // e.g. "projects.create"
+  granted        Boolean    @default(true)
+  createdAt      DateTime   @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, role, permission])
+  @@map("role_permission_overrides")
 }
 
 // ─────────────────────────────────────────────

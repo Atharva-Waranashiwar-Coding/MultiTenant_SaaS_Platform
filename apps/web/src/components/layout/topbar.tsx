@@ -15,6 +15,7 @@ import {
 import { getInitials } from '@/lib/utils';
 import { LogOut, User } from 'lucide-react';
 import Link from 'next/link';
+import { NotificationBell } from './notification-bell';
 
 export function Topbar() {
   const { data: user } = useMe();
@@ -25,6 +26,9 @@ export function Topbar() {
   return (
     <header className="flex h-14 items-center justify-between border-b bg-background px-6">
       <div />
+
+      <div className="flex items-center gap-2">
+        <NotificationBell />
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -66,6 +70,7 @@ export function Topbar() {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      </div>
     </header>
   );
 }

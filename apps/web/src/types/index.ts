@@ -194,3 +194,67 @@ export interface TaskComment {
   updatedAt: string;
   user?: UserSummary;
 }
+
+// ── Phase 3 types ──────────────────────────────────────────
+
+export type SubscriptionPlan = 'FREE' | 'STARTER' | 'GROWTH' | 'ENTERPRISE';
+export type SubscriptionStatus = 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'CANCELLED' | 'EXPIRED';
+export type NotificationType =
+  | 'INVITE_ACCEPTED'
+  | 'MEMBER_ADDED'
+  | 'MEMBER_ROLE_CHANGED'
+  | 'PROJECT_ASSIGNED'
+  | 'TASK_ASSIGNED'
+  | 'TASK_DUE_SOON';
+
+export interface Subscription {
+  id: string;
+  organizationId: string;
+  plan: SubscriptionPlan;
+  status: SubscriptionStatus;
+  seatLimit: number;
+  trialStartAt?: string | null;
+  trialEndAt?: string | null;
+  billingEmail?: string | null;
+  currentPeriodStart?: string | null;
+  currentPeriodEnd?: string | null;
+  features: Record<string, boolean>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PlanFeature {
+  plan: SubscriptionPlan;
+  seatLimit: number;
+  features: Record<string, boolean>;
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  organizationId: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  meta?: Record<string, unknown> | null;
+  isRead: boolean;
+  readAt?: string | null;
+  createdAt: string;
+}
+
+export interface PaginatedResult<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface RolePermissionOverride {
+  id: string;
+  organizationId: string;
+  role: MemberRole;
+  permission: string;
+  granted: boolean;
+  createdAt: string;
+}

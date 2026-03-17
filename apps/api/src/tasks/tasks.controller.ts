@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -7,9 +7,11 @@ import { CreateCommentDto } from './dto/create-comment.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { TaskStatus } from '@prisma/client';
+import { TenantGuard } from '../common/guards/tenant.guard';
 
 @ApiTags('Tasks')
 @ApiBearerAuth('access-token')
+@UseGuards(TenantGuard)
 @Controller('organizations/:orgId/projects/:projectId/tasks')
 export class TasksController {
   constructor(private readonly svc: TasksService) {}

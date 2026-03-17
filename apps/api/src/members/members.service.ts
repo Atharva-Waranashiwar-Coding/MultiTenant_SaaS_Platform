@@ -6,7 +6,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { AuditAction, MemberRole, Prisma } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
+import { AuditAction, MemberRole, NotificationType, Prisma } from '@prisma/client';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 
 @Injectable()
@@ -14,6 +15,7 @@ export class MembersService {
   constructor(
     private prisma: PrismaService,
     private auditService: AuditService,
+    private notifications: NotificationsService,
   ) {}
 
   // ── List members with search + filter (Phase 2 extension) ────
@@ -126,6 +128,17 @@ export class MembersService {
     });
 
     await this.auditService.log({ action: AuditAction.MEMBER_ROLE_CHANGED, userId: actorId, organizationId, targetUserId, meta: { from: targetMembership.role, to: dto.role } });
+
+    // Notify the affected member about their role change
+    await this.notifications.notify({
+      userId: targetUserId,
+      orgId: organizationId,
+      type: NotificationType.MEMBER_ROLE_CHANGED,
+      title: 'Your role was updated',
+      body: `Your role changed from ${targetMembership.role} to ${dto.role}.`,
+      meta: { from: targetMembership.role, to: dto.role },
+    });
+
     return updated;
   }
 

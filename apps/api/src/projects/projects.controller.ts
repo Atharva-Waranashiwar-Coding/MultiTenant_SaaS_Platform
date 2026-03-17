@@ -1,13 +1,15 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { TenantGuard } from '../common/guards/tenant.guard';
 
 @ApiTags('Projects')
 @ApiBearerAuth('access-token')
+@UseGuards(TenantGuard)
 @Controller('organizations/:orgId/projects')
 export class ProjectsController {
   constructor(private readonly svc: ProjectsService) {}

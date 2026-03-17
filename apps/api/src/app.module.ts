@@ -12,6 +12,10 @@ import { DepartmentsModule } from './departments/departments.module';
 import { TeamsModule } from './teams/teams.module';
 import { ProjectsModule } from './projects/projects.module';
 import { TasksModule } from './tasks/tasks.module';
+// Phase 3
+import { NotificationsModule } from './notifications/notifications.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { PermissionsModule } from './permissions/permissions.module';
 
 @Module({
   imports: [
@@ -28,6 +32,10 @@ import { TasksModule } from './tasks/tasks.module';
     TeamsModule,
     ProjectsModule,
     TasksModule,
+    // Phase 3
+    NotificationsModule,
+    SubscriptionsModule,
+    PermissionsModule,
   ],
 })
 export class AppModule {}

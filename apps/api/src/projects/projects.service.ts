@@ -6,7 +6,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { AuditAction, MemberRole, Prisma } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
+import { AuditAction, MemberRole, NotificationType, Prisma } from '@prisma/client';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 
@@ -19,6 +20,7 @@ export class ProjectsService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
+    private notifications: NotificationsService,
   ) {}
 
   async create(orgId: string, actorId: string, dto: CreateProjectDto) {
@@ -138,6 +140,19 @@ export class ProjectsService {
     });
 
     await this.audit.log({ action: AuditAction.PROJECT_MEMBER_ADDED, userId: actorId, organizationId: orgId, targetUserId: userId, meta: { projectId } });
+
+    // Notify the added member (skip self-add)
+    if (userId !== actorId) {
+      await this.notifications.notify({
+        userId,
+        orgId,
+        type: NotificationType.PROJECT_ASSIGNED,
+        title: 'Added to a project',
+        body: `You have been added to project "${project.name}".`,
+        meta: { projectId },
+      });
+    }
+
     return member;
   }
 

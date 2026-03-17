@@ -5,7 +5,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { AuditAction, TaskStatus } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
+import { AuditAction, NotificationType, TaskStatus } from '@prisma/client';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
@@ -17,6 +18,7 @@ export class TasksService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
+    private notifications: NotificationsService,
   ) {}
 
   // ── Helpers ───────────────────────────────────────────────────
@@ -120,6 +122,17 @@ export class TasksService {
 
     if (dto.assigneeId && dto.assigneeId !== task.assigneeId) {
       await this.audit.log({ action: AuditAction.TASK_ASSIGNED, userId: actorId, organizationId: orgId, targetUserId: dto.assigneeId, meta: { taskId, projectId } });
+      // Notify the new assignee (skip if they assigned it to themselves)
+      if (dto.assigneeId !== actorId) {
+        await this.notifications.notify({
+          userId: dto.assigneeId,
+          orgId,
+          type: NotificationType.TASK_ASSIGNED,
+          title: 'Task assigned to you',
+          body: `You have been assigned to "${updated.title ?? task.title}".`,
+          meta: { taskId, projectId },
+        });
+      }
     }
 
     return updated;

@@ -1,13 +1,15 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { MembersService } from './members.service';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { MemberRole } from '@prisma/client';
+import { TenantGuard } from '../common/guards/tenant.guard';
 
 @ApiTags('Members')
 @ApiBearerAuth('access-token')
+@UseGuards(TenantGuard)
 @Controller('organizations/:orgId/members')
 export class MembersController {
   constructor(private readonly membersService: MembersService) {}
