@@ -16,6 +16,8 @@ import { TasksModule } from './tasks/tasks.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { PermissionsModule } from './permissions/permissions.module';
+// Phase 4
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -36,6 +38,8 @@ import { PermissionsModule } from './permissions/permissions.module';
     NotificationsModule,
     SubscriptionsModule,
     PermissionsModule,
+    // Phase 4
+    AnalyticsModule,
   ],
 })
 export class AppModule {}

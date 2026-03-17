@@ -1,9 +1,19 @@
 import apiClient from '../axios';
-import type { AuditLog } from '@/types';
+import type { AuditLog, PaginatedResult } from '@/types';
+
+export interface AuditFilters {
+  userId?: string;
+  action?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  limit?: number;
+}
 
 export const auditApi = {
-  list: (orgId: string, limit?: number) =>
+  list: (orgId: string, filters: AuditFilters = {}) =>
     apiClient
-      .get<AuditLog[]>(`/organizations/${orgId}/audit`, { params: { limit } })
+      .get<PaginatedResult<AuditLog>>(`/organizations/${orgId}/audit`, { params: filters })
       .then((r) => r.data),
 };

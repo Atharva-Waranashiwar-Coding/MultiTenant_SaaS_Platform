@@ -258,3 +258,40 @@ export interface RolePermissionOverride {
   granted: boolean;
   createdAt: string;
 }
+
+// ── Phase 4 types ──────────────────────────────────────────
+
+export interface AnalyticsSummary {
+  members: {
+    total: number;
+    active: number;
+    inactive: number;
+    roleBreakdown: Record<MemberRole, number>;
+  };
+  teams: { total: number };
+  departments: { total: number };
+  invitations: { total: number; pending: number };
+  projects: {
+    total: number;
+    active: number;
+    archived: number;
+    statusBreakdown: Record<string, number>;
+  };
+  tasks: {
+    total: number;
+    overdue: number;
+    statusBreakdown: Record<string, number>;
+  };
+  activity: { recentAuditEvents: number };
+}
+
+export interface TrendMonth {
+  label: string;
+  newMembers: number;
+  newProjects: number;
+  tasksCompleted: number;
+}
+
+export interface AnalyticsTrends {
+  months: TrendMonth[];
+}

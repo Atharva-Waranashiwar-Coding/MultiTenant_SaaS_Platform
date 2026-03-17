@@ -12,8 +12,16 @@ interface LogParams {
   userAgent?: string;
 }
 
-// Thin service for writing audit log entries.
-// Called from other services — never directly from controllers.
+export interface AuditFilters {
+  userId?: string;
+  action?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  limit?: number;
+}
+
 @Injectable()
 export class AuditService {
   constructor(private prisma: PrismaService) {}
@@ -22,15 +30,46 @@ export class AuditService {
     await this.prisma.auditLog.create({ data: params });
   }
 
-  // Get audit logs for an organization (for the UI)
-  findByOrganization(organizationId: string, limit = 50) {
-    return this.prisma.auditLog.findMany({
-      where: { organizationId },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true } },
-      },
-    });
+  async findByOrganization(organizationId: string, filters: AuditFilters = {}) {
+    const { userId, action, search, dateFrom, dateTo, page = 1, limit = 50 } = filters;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.AuditLogWhereInput = { organizationId };
+
+    if (userId) where.userId = userId;
+    if (action) where.action = action as AuditAction;
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
+      if (dateTo) where.createdAt.lte = new Date(dateTo);
+    }
+    if (search) {
+      where.OR = [
+        { user: { firstName: { contains: search, mode: 'insensitive' } } },
+        { user: { lastName: { contains: search, mode: 'insensitive' } } },
+        { user: { email: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true, email: true } },
+        },
+      }),
+      this.prisma.auditLog.count({ where }),
+    ]);
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 }

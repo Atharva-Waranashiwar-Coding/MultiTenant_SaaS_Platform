@@ -230,6 +230,8 @@ model Membership {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([userId, organizationId])
+  @@index([organizationId, role])
+  @@index([organizationId, isActive])
   @@map("memberships")
 }
 
@@ -306,6 +308,10 @@ model Team {
   organizationId String
   departmentId   String?  // optional: team can sit under a department
   createdById    String
+  isArchived     Boolean  @default(false)
+  archivedAt     DateTime?
+  isDeleted      Boolean  @default(false)
+  deletedAt      DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -361,6 +367,8 @@ model Project {
   members      ProjectMember[]
   tasks        Task[]
 
+  @@index([organizationId, status])
+  @@index([organizationId, isArchived])
   @@map("projects")
 }
 
@@ -407,6 +415,9 @@ model Task {
   createdBy User         @relation("TaskCreatedBy", fields: [createdById], references: [id])
   comments  TaskComment[]
 
+  @@index([projectId, status])
+  @@index([projectId, isDeleted])
+  @@index([assigneeId])
   @@map("tasks")
 }
 
@@ -511,5 +522,14 @@ model AuditLog {
   user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([organizationId, action])
+  @@index([organizationId, userId])
   @@map("audit_logs")
 }
+
+// ─────────────────────────────────────────────
+// PERFORMANCE INDEXES (Phase 4)
+// ─────────────────────────────────────────────
+// Additional model-level indexes are declared
+// inline above where Prisma allows @@index.

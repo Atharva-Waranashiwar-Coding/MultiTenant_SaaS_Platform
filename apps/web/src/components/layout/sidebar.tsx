@@ -14,6 +14,7 @@ import {
   Bell,
   CreditCard,
   Shield,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
@@ -28,6 +29,7 @@ const navItems = [
   { href: '/projects',     label: 'Projects',      icon: FolderKanban },
   // Admin section
   { href: '/members',      label: 'Members',       icon: Layers, roles: ['OWNER', 'ADMIN', 'MANAGER'] },
+  { href: '/admin',        label: 'Admin Analytics', icon: BarChart3, roles: ['OWNER', 'ADMIN'] },
   { href: '/notifications',label: 'Notifications', icon: Bell },
   // Settings group
   { href: '/settings',     label: 'Settings',      icon: Settings },
