@@ -1,10 +1,21 @@
 # MultiTenant SaaS Admin Platform
 
-A production-grade, multi-tenant SaaS admin platform built from scratch with **Next.js 14**, **NestJS**, **Prisma**, and **PostgreSQL**. Organizations create isolated workspaces, invite members, manage roles & permissions, track projects and tasks, and operate inside fully scoped dashboards — with analytics, audit trails, billing scaffolding, and file attachments.
+A workspace platform for organizations, members, projects, and tasks, with tenant-scoped APIs, role management, audit trails, and analytics.
 
-> Built as a portfolio project to demonstrate real-world full-stack architecture across authentication, multi-tenancy, RBAC, data modelling, and modern React patterns.
+**Stack:** Next.js, React, TypeScript, NestJS, Prisma, PostgreSQL, Docker Compose.
 
----
+## Local demo
+
+Follow [Quick Start](#quick-start), seed the database, and open [the workspace](http://localhost:3000). Sign in with a seeded demo account, inspect organization members, create a project and task, then review the audit trail. No hosted demo is currently linked.
+
+## Architecture notes
+
+- Organization membership guards and organization-scoped data access form the tenant boundary.
+- Access tokens and rotating database-backed refresh tokens separate short-lived API access from session renewal.
+- Billing is scaffolding and email delivery is not implemented. Local attachment storage and authorization behavior need review before public deployment.
+
+<details>
+<summary>Features, setup, API reference, and design decisions</summary>
 
 ## Live Features at a Glance
 
@@ -155,9 +166,9 @@ Seeded automatically by `npx prisma db seed`:
 
 | Email | Password | Role |
 |---|---|---|
-| `alice@demo.com` | `Password123!` | OWNER — Demo Corp |
-| `bob@demo.com` | `Password123!` | ADMIN — Demo Corp |
-| `carol@demo.com` | `Password123!` | MEMBER — Demo Corp |
+| `alice@demo.com` | `Password123!` | OWNER - Demo Corp |
+| `bob@demo.com` | `Password123!` | ADMIN - Demo Corp |
+| `carol@demo.com` | `Password123!` | MEMBER - Demo Corp |
 
 The seed also creates sample projects, tasks, departments, teams, and audit entries so the dashboard is populated on first login.
 
@@ -292,13 +303,13 @@ organizations
 ## Key Design Decisions
 
 ### Multi-tenancy
-All data is scoped by `organizationId`. The `TenantGuard` (applied at controller level) verifies the requesting user is an active member of the target org before any handler runs — no per-endpoint tenant check needed.
+All data is scoped by `organizationId`. The `TenantGuard` (applied at controller level) verifies the requesting user is an active member of the target org before any handler runs - no per-endpoint tenant check needed.
 
 ### JWT Auth
 Short-lived access tokens (15 min) + long-lived refresh tokens (7 days) stored in the DB and rotated on each refresh. Refresh tokens are invalidated on logout.
 
 ### File Uploads
-Files are stored on local disk (`apps/api/uploads/`) via Multer. The `storagePath` column stores the path — trivial to swap for an S3 key later. Downloads go through an authenticated endpoint so anonymous access to stored files is impossible.
+Files are stored on local disk (`apps/api/uploads/`) via Multer. The `storagePath` column stores the path - trivial to swap for an S3 key later. Downloads go through an authenticated endpoint so anonymous access to stored files is impossible.
 
 ### Bulk Actions
 Bulk endpoints filter out protected records (self, OWNERs) before executing, preventing privilege escalation even if the client sends arbitrary IDs. All bulk operations are logged to the audit trail.
@@ -334,31 +345,33 @@ Tasks use `isDeleted`/`deletedAt`. Bulk restore flips them back. This preserves 
 
 ## Implementation Phases
 
-### Phase 1 — Core Auth & Multi-tenancy
+### Phase 1 - Core Auth & Multi-tenancy
 User auth (signup/login/refresh/logout), JWT rotation, email verification scaffold, organization CRUD, membership model (OWNER/ADMIN/MANAGER/MEMBER), email invitations, member role changes, audit logging, dashboard shell.
 
-### Phase 2 — Organizations, Teams, Projects
+### Phase 2 - Organizations, Teams, Projects
 Departments with leads, teams scoped to departments, full project CRUD (status/priority/tags/due dates/archive), task management with comments, per-project member management, role-based access to UI actions.
 
-### Phase 3 — RBAC, Billing, Notifications, Search
+### Phase 3 - RBAC, Billing, Notifications, Search
 Custom role-permission overrides per org, subscription plans with seat limits and feature flags, in-app notification system, cross-entity search endpoint, tenant isolation hardening.
 
-### Phase 4 — Analytics, Audit Explorer, Performance
+### Phase 4 - Analytics, Audit Explorer, Performance
 Organization analytics dashboard (KPI cards + 6-month trend charts), admin analytics overview, audit log explorer with per-action/user/date filtering, DB indexes on hot query paths, team soft-delete.
 
-### Phase 5 — UX Polish, Bulk Actions, Attachments, Settings
+### Phase 5 - UX Polish, Bulk Actions, Attachments, Settings
 Skeleton loaders, toast system, bulk select + bulk actions (members/projects/tasks), file attachments (upload/download/delete) on projects and tasks, org branding settings (brand color, timezone, default invite role), user profile settings page, improved people list.
 
 ---
 
 ## Extending This Project
 
-**Email sending** — Both `auth.service.ts` and `invitations.service.ts` have `// TODO: send email` comments. Wire in Nodemailer, Resend, or SendGrid there.
+**Email sending** - Both `auth.service.ts` and `invitations.service.ts` have `// TODO: send email` comments. Wire in Nodemailer, Resend, or SendGrid there.
 
-**S3 file storage** — Replace the `diskStorage` config in `attachments.controller.ts` with an S3 upload, and swap `res.sendFile` in the download handler for a signed URL redirect.
+**S3 file storage** - Replace the `diskStorage` config in `attachments.controller.ts` with an S3 upload, and swap `res.sendFile` in the download handler for a signed URL redirect.
 
-**CASL permissions** — Replace `RolesGuard` with a CASL `AbilityGuard` to drive access control from the `role_permission_overrides` table already in the DB.
+**CASL permissions** - Replace `RolesGuard` with a CASL `AbilityGuard` to drive access control from the `role_permission_overrides` table already in the DB.
 
-**Real-time** — Add Socket.IO to the NestJS app and emit events from service methods. The notification table already exists; push new notifications instead of polling.
+**Real-time** - Add Socket.IO to the NestJS app and emit events from service methods. The notification table already exists; push new notifications instead of polling.
 
-**Row-level security** — Add a Prisma middleware that auto-injects `{ organizationId }` scoping to all read queries, eliminating any risk of cross-tenant data leaks.
+**Row-level security** - Add a Prisma middleware that auto-injects `{ organizationId }` scoping to all read queries, eliminating any risk of cross-tenant data leaks.
+
+</details>
